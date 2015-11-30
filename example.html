@@ -1,0 +1,153 @@
+﻿<script type="text/javascript">
+  // prototype, constructor, __proto__について
+  (function () {
+    // 関数を作っただけの場合
+    var Hoge = function() {
+      this.hoge = 'hoge';
+    };
+    console.log('---------------------------1');
+    console.log(Hoge.constructor);                         // Function() { [native code] }
+    console.log(Hoge.prototype.constructor == Hoge);       // true
+    console.log((new Hoge()).constructor);                 // () {this.hoge = 'hoge';}
+
+    // 関数のprototypeに別のnewされた関数を入れた場合
+    var Foo = function() {
+      this.foo = 'foo';
+    };
+    Foo.bar = 'bar';
+    Foo.prototype.fuga = 'fuga';
+    var foo = new Foo();
+    Hoge.prototype = foo;
+    console.log('---------------------------2');
+    console.log(Hoge.prototype == foo);                   // true
+    console.log(Hoge.prototype.constructor);              // function () {this.foo = 'foo';}
+    console.log(Hoge.constructor);                        // Function() { [native code] } Hoge自体はただのfunctionのためFunctionが返る
+
+    // 関数をnewした場合、prototypeには別の関数
+    var hoge = new Hoge();
+    console.log('---------------------------3');
+    console.log(hoge.prototype);                          // undefined
+    console.log(hoge.__proto__);                          // Foo {foo: "foo"}
+    console.log(hoge.__proto__.bar);                      // undefined - barはprototypeに定義されていないので見つけられない
+    console.log(hoge.__proto__.fuga);                     // fuga     - fugaはprototypeに定義されているので見つけられる
+    console.log(Object.getPrototypeOf(hoge));             // Foo {foo: "foo"}
+    console.log(hoge.__proto__.constructor);              // true
+    console.log(hoge.constructor);                        // Hoge.prototypeにfooをそのまま代入しているのでconstructorプロパティごと上書きされる、よってHogeのconstructorがFooのconstructorまで遡る
+
+    var a = new Array();
+    console.log(a.constructor == Array);                  // true
+    console.log(a.__proto__.constructor == Array);        // true
+
+    // インスタンスから
+    console.log("test".__proto__ === String.prototype);
+    console.log("test".constructor.prototype === String.prototype);
+    console.log("test".__proto__.constructor.prototype);
+
+    // 余談
+    // Hoge.prototype = Foo の怖さ
+    // のようにすると、Hogeのprototypeにnewされていない関数が入るので、いろいろとおかしくなる
+    // たとえば、new Hoge()した場合は、prototypeプロパティにアクセスできないはずだが、
+    // __proto__経由で、Fooのprototypeにアクセスできてしまい、
+    // hoge.prototypeが成立してしまう
+
+    // __proto__を遡ってrootまで取得する関数
+    // via http://stackoverflow.com/questions/14162038/in-javascript-what-is-the-ultimate-root-object-or-function
+    console.log('---------------------------4');
+    function getPrototypes(obj) {
+      var protos = [],
+          parent = obj;
+      while ( true ) {
+        parent = Object.getPrototypeOf(parent);
+        if ( parent === null ) {
+          break;
+        }
+        protos.push(parent);
+      }
+      return protos;
+    }
+
+    // やはりrootはObject
+    console.log(getPrototypes(hoge));
+    console.log(getPrototypes(''));
+  })();
+
+
+  // __proto__の標準版、古いブラウザではObject.getPrototypeOfがない場合があるが、その場合は__proto__でアクセスできる
+  // ただし、__proto__は非標準
+  console.log('---------------------------5');
+  (function() {
+    var Obj1 = function() {};
+    var Obj2 = function() {};
+    Obj1.prototype = Obj2;
+    var obj1 = new Obj1();
+
+    console.log(Object.getPrototypeOf(obj1) == Obj2);    // true
+  })();
+
+
+  // prototypeのメソッドを直接呼ぶケース
+  console.log('---------------------------6');
+  (function () {
+    console.log(arguments.forEach);		// argumentsはArrayではないのでforEachがundefined
+    var arg = Array.prototype.slice.call(arguments, 0);		// Arrayに変換
+    console.log(arg);
+    console.log(arg.forEach);					// ArrayにしたのでforEachがある
+  })("hoge", "foo", "bar");
+
+
+  // あるオブジェクトのプロパティへのアクセスは、まずそのオブジェクト自身のプロパティを探し、
+  // 見つからなければそのオブジェクトのコンストラクタのprototypeプロパティに設定されたオブジェクトを見にいきます。
+  console.log('---------------------------7');
+  (function () {
+    var arr = new Array();
+    console.log(arr.prototype == null);					// true
+    console.log(arr.__proto__ === Array.prototype);		// true
+
+    // constructorはプロトタイプチェーンから取得
+    console.log(arr.constructor === Array);				// true
+    console.log(arr.hasOwnProperty("constructor"));		// false
+    console.log(Array.hasOwnProperty("prototype"));	// true
+
+    // instance→Array→Object
+    console.log(arr.__proto__.__proto__ == Object.prototype);	// true
+
+    // Array→Object
+    console.log(Array.prototype.__proto__ == Object.prototype);		// true
+
+    // Arrayが持つプロパティやメソッドはprototypeに入ってる
+    console.log(Array.prototype.length);		// 0
+    console.log(Array.prototype.constructor);	// Array()
+
+    // じゃあこれは？
+    console.log(Object.length);		// 1
+    console.log(Array.length);		// 1
+    console.log(String.length);		// 1
+  })();
+
+  // prototypeの上書きの仕方によって、prototype元にどう影響するかのパターン
+  console.log('---------------------------8');
+  (function () {
+    // prototypeにオブジェクトを入れて、後からオブジェクトを上書きした場合は
+    // 別のprototypeオブジェクトになるので、それはnewされたときのprototypeとは別物になる
+    var Class = function(){}
+    Class.prototype = {color : "red"};
+
+    var class1 = new Class();
+    console.log(class1.color);
+
+    Class.prototype = {color : "blue"};
+    console.log(class1.color);		// redのまま、prototypeを上書きしているので以前のほうが残る
+
+
+    // こっちは同じprototypeオブジェクトに対してプロパティを書き換えてる
+    // この場合はnewされた全オブジェクトに影響を受ける
+    var Class = function(){}
+    Class.prototype.color = "red";
+
+    var class1 = new Class();
+    console.log(class1.color);
+
+    Class.prototype.color = "blue";
+    console.log(class1.color);		// blueに変化、prototypeのオブジェクトは同じなので値が変わってしまう
+  })();
+</script>
